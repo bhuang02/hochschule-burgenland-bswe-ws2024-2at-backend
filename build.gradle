@@ -90,7 +90,7 @@ checkstyle {
 pmd {
   consoleOutput = true
   ruleSetFiles = files("config/pmd/ruleset.xml")
-  toolVersion = "7.24.0"
+  toolVersion = "7.25.0"
 }
 
 jacocoTestReport {
