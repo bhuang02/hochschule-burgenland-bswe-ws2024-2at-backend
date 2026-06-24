@@ -52,6 +52,8 @@ dependencies {
   developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
   runtimeOnly 'com.h2database:h2'
+  runtimeOnly 'org.postgresql:postgresql'
+  runtimeOnly 'org.flywaydb:flyway-database-postgresql'
   runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
   annotationProcessor 'org.projectlombok:lombok'
