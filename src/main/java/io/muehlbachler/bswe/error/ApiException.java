@@ -38,6 +38,7 @@ public class ApiException extends Exception {
       case GEOCODING_FAILED:
       case NO_AIRPORT_FOUND:
       case FORECAST_FAILED:
+      case METAR_FAILED:
       case NO_DATA:
         return HttpStatus.BAD_REQUEST;
       case SAVE_ERROR:
@@ -56,6 +57,7 @@ public class ApiException extends Exception {
     GEOCODING_FAILED,
     NO_AIRPORT_FOUND,
     FORECAST_FAILED,
+    METAR_FAILED,
     INTERNAL_SERVER_ERROR
   }
 }

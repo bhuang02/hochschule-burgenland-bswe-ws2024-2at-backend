@@ -1,5 +1,10 @@
 package io.muehlbachler.bswe.service.impl;
 
+import io.muehlbachler.bswe.error.ApiException;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
+import org.springframework.core.ParameterizedTypeReference;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.muehlbachler.bswe.configuration.ApiConfiguration;
@@ -27,6 +32,7 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class AviationServiceImpl implements AviationService {
   private static final Logger LOG = LoggerFactory.getLogger(AviationServiceImpl.class);
+  private static final Pattern ICAO_PATTERN = Pattern.compile("^[A-Z]{4}$");
 
   @Autowired
   private final ApiConfiguration apiConfiguration;
@@ -76,5 +82,41 @@ public class AviationServiceImpl implements AviationService {
   protected NearestAirportResultStation getNearestAirportFallback(final Exception ex) {
     LOG.error("failed to fetch nearest airport", ex);
     return null;
+  }
+
+  @Override
+  public Map<String, Object> getMetar(final String icao) throws ApiException {
+    final String normalizedIcao = icao == null ? "" : icao.trim().toUpperCase(Locale.ROOT);
+
+    if (!ICAO_PATTERN.matcher(normalizedIcao).matches()) {
+      throw new ApiException(ApiException.ApiExceptionType.METAR_FAILED);
+    }
+
+    LOG.info("fetching METAR for airport {}", normalizedIcao);
+
+    try {
+      final HttpHeaders headers = new HttpHeaders();
+      headers.add(apiConfiguration.getMetar().getAuthorization().getHeader(),
+          apiConfiguration.getMetar().getAuthorization().getValue());
+
+      final HttpEntity<String> request = new HttpEntity<>(headers);
+
+      final ResponseEntity<Map<String, Object>> result = restTemplate.exchange(
+          apiConfiguration.getMetar().getUrl(),
+          HttpMethod.GET,
+          request,
+          new ParameterizedTypeReference<Map<String, Object>>() {
+          },
+          normalizedIcao);
+
+      if (result == null || result.getStatusCode() != HttpStatus.OK || !result.hasBody()) {
+        throw new ApiException(ApiException.ApiExceptionType.METAR_FAILED);
+      }
+
+      return result.getBody();
+    } catch (final RestClientException e) {
+      LOG.error("failed to fetch METAR response: {}", e.getMessage());
+      throw new ApiException(ApiException.ApiExceptionType.METAR_FAILED, e);
+    }
   }
 }
