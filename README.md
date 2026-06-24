@@ -1,3 +1,220 @@
+## Running the application locally with Docker images
+
+The application consists of two Docker images:
+
+* **Backend**: Spring Boot API, runs on port `8080`
+* **Frontend**: Quasar/nginx frontend, runs on port `8081`
+
+The backend can run either with the default in-memory H2 database or with PostgreSQL.
+
+---
+
+## Prerequisites
+
+You need:
+
+* Docker installed
+* An AVWX API token
+* Access to the container images, for example from GHCR
+
+If the images are private, log in to GHCR first:
+
+```bash
+echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+The GitHub token needs permission to read packages.
+
+Set the image owner and tags:
+
+```bash
+export OWNER="your-github-username-or-org"
+export BACKEND_TAG="latest"
+export FRONTEND_TAG="latest"
+export AVWX_API_KEY="Token your_avwx_token_here"
+```
+
+---
+
+## Option 1: Run backend with H2
+
+This is the quickest way to test the backend. Data is stored in memory and disappears when the container stops.
+
+```bash
+docker run --rm \
+  --name weather-backend \
+  -p 8080:8080 \
+  -e AVWX_API_KEY="$AVWX_API_KEY" \
+  ghcr.io/$OWNER/backend:$BACKEND_TAG
+```
+
+Test the backend:
+
+```bash
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/api/user/
+curl http://localhost:8080/api/metar/LOWW
+```
+
+Expected result:
+
+* `/actuator/health` should return status `UP`
+* `/api/user/` should return the seeded users
+* `/api/metar/LOWW` should return METAR data for Vienna airport
+
+---
+
+## Option 2: Run backend with PostgreSQL
+
+This is closer to the production/Cloud SQL setup.
+
+Start PostgreSQL:
+
+```bash
+docker run -d --rm \
+  --name weather-postgres \
+  -p 5432:5432 \
+  -e POSTGRES_DB=weatherapp \
+  -e POSTGRES_USER=weatherapp \
+  -e POSTGRES_PASSWORD=weatherpass \
+  postgres:16
+```
+
+Start the backend with the PostgreSQL profile:
+
+```bash
+docker run --rm \
+  --name weather-backend \
+  -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=postgres \
+  -e DB_HOST=host.docker.internal \
+  -e DB_PORT=5432 \
+  -e DB_NAME=weatherapp \
+  -e DB_USERNAME=weatherapp \
+  -e DB_PASSWORD=weatherpass \
+  -e AVWX_API_KEY="$AVWX_API_KEY" \
+  ghcr.io/$OWNER/backend:$BACKEND_TAG
+```
+
+Test the backend:
+
+```bash
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/api/user/
+curl http://localhost:8080/api/metar/LOWW
+```
+
+In the health response, the database component should show PostgreSQL:
+
+```json
+{
+  "components": {
+    "db": {
+      "details": {
+        "database": "PostgreSQL"
+      },
+      "status": "UP"
+    }
+  },
+  "status": "UP"
+}
+```
+
+---
+
+## Run the frontend
+
+Start the frontend:
+
+```bash
+docker run --rm \
+  --name weather-frontend \
+  -p 8081:80 \
+  ghcr.io/$OWNER/frontend:$FRONTEND_TAG
+```
+
+Open the app in the browser:
+
+```text
+http://localhost:8081
+```
+
+Make sure to use `http://`, not `https://`.
+
+---
+
+## Optional: Override frontend runtime config
+
+If the frontend image needs to be told where the backend is running, create a local config file:
+
+```bash
+cat > config.local.js <<'EOF'
+window.APP_CONFIG = {
+  enabled: true,
+  VITE_BACKEND_API_URL: 'http://localhost:8080/api'
+};
+EOF
+```
+
+Then run the frontend with the config file mounted into nginx:
+
+```bash
+docker run --rm \
+  --name weather-frontend \
+  -p 8081:80 \
+  -v "$PWD/config.local.js:/usr/share/nginx/html/config.js:ro" \
+  ghcr.io/$OWNER/frontend:$FRONTEND_TAG
+```
+
+For local Docker testing, use:
+
+```js
+VITE_BACKEND_API_URL: 'http://localhost:8080/api'
+```
+
+For Kubernetes, the frontend ConfigMap should use:
+
+```js
+VITE_BACKEND_API_URL: '/api'
+```
+
+---
+
+## Useful backend endpoints
+
+```text
+GET http://localhost:8080/actuator/health
+GET http://localhost:8080/api/user/
+GET http://localhost:8080/api/metar/LOWW
+GET http://localhost:8080/api/81150016-8501-4b97-9168-01113e21d8a5/favorite/
+```
+
+Example ICAO airport codes:
+
+```text
+LOWW = Vienna International Airport
+LOWL = Linz Airport
+LOWS = Salzburg Airport
+LOWG = Graz Airport
+EDDF = Frankfurt Airport
+EGLL = London Heathrow
+KJFK = New York JFK
+```
+
+---
+
+## Notes
+
+* H2 is useful for quick local testing.
+* PostgreSQL is used for production-like testing and Cloud SQL compatibility.
+* The AVWX API key must be passed to the backend as an environment variable.
+* The frontend should not contain the AVWX API key.
+* In Kubernetes, secrets will be provided through External Secrets and Kubernetes Secrets.
+* In Kubernetes, the frontend should call the backend through `/api`, not `localhost`.
+
+
+---
+
 # Hochschule Burgenland - BSWE - WS2024 - 2nd Attempt - Weather App - Backend - Reference
 
 [![](https://img.shields.io/github/license/muhlba91/hochschule-burgenland-bswe-ws2024-2at-backend?style=for-the-badge)](LICENSE.md)
