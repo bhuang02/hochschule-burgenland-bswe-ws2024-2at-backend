@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: Weather API
-  version: v1.1.2 #x-release-please-version
+  version: v1.2.0 #x-release-please-version
   description: |
     This is a simple weather API that allows users to create save favorite locations, and get weather forecasts for those locations.
     Additionally, users can be created and listed.
